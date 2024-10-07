@@ -19,6 +19,7 @@ class AdjacencyMatrixFA:
     Attributes:
         states_count: amount of states in automaton
         states: map of states' names to indicies
+        adj: boolean adjacency matrices for respective transition symbols
         start_states: indices of start states
         final_states: indices of final states
     """
@@ -46,11 +47,11 @@ class AdjacencyMatrixFA:
 
             inter.states[(st1, st2)] = inter_idx
 
-        for sym, adj1 in fa1._adj_matrices.items():
-            if (adj2 := fa2._adj_matrices.get(sym)) is None:
+        for sym, adj1 in fa1.adj.items():
+            if (adj2 := fa2.adj.get(sym)) is None:
                 continue
 
-            inter._adj_matrices[sym] = cast(csr_array, kron(adj1, adj2, format="csr"))
+            inter.adj[sym] = cast(csr_array, kron(adj1, adj2, format="csr"))
 
         return inter
 
@@ -62,7 +63,7 @@ class AdjacencyMatrixFA:
         if fa is None:
             self.states_count = 0
             self.states = {}
-            self._adj_matrices = {}
+            self.adj = {}
             return
 
         graph = fa.to_networkx()
@@ -86,7 +87,7 @@ class AdjacencyMatrixFA:
             transitions[sym][idx1, idx2] = True
 
         # convert to sparse matrices
-        self._adj_matrices: dict[Symbol, csr_array] = {
+        self.adj: dict[Symbol, csr_array] = {
             sym: csr_array(matrix) for (sym, matrix) in transitions.items()
         }
 
@@ -107,7 +108,7 @@ class AdjacencyMatrixFA:
                     return True
                 continue
 
-            if (adj := self._adj_matrices.get(conf.word[0])) is None:
+            if (adj := self.adj.get(conf.word[0])) is None:
                 continue
 
             for next_state in range(self.states_count):
@@ -121,10 +122,10 @@ class AdjacencyMatrixFA:
         Returns transitive closure for automaton states.
         Get indices from `states` attribute to index the matrix
         """
-        if not self._adj_matrices:
+        if not self.adj:
             return np.diag(np.ones(self.states_count, dtype=bool_))
 
-        matrices = list(self._adj_matrices.values())
+        matrices = list(self.adj.values())
         sum: csr_array = reduce(operator.add, matrices[1:], matrices[0])
         sum.setdiag(True)  # make reflexive
 
