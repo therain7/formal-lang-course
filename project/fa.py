@@ -76,20 +76,15 @@ class AdjacencyMatrixFA:
             if ddict.get("is_final"):
                 self.final_states.add(self.states[st])
 
-        transitions: dict[Symbol, NDArray[bool_]] = defaultdict(
-            lambda: np.zeros((self.states_count, self.states_count), dtype=bool_)
+        self.adj: dict[Symbol, csr_array] = defaultdict(
+            lambda: csr_array((self.states_count, self.states_count), dtype=bool)
         )
         for idx1, idx2, sym in (
             (self.states[st1], self.states[st2], Symbol(lbl))
             for st1, st2, lbl in graph.edges(data="label")
             if lbl
         ):
-            transitions[sym][idx1, idx2] = True
-
-        # convert to sparse matrices
-        self.adj: dict[Symbol, csr_array] = {
-            sym: csr_array(matrix) for (sym, matrix) in transitions.items()
-        }
+            self.adj[sym][idx1, idx2] = True
 
     def accepts(self, word: Iterable[Symbol]) -> bool:
         class Conf(NamedTuple):
