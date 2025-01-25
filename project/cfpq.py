@@ -59,16 +59,14 @@ def hellings_based_cfpq(
     }
 
     def eval_new(e1: HellingsEdge, e2: HellingsEdge) -> set[HellingsEdge]:
-        new = set()
-
         if e1.end == e2.start and (body := (e1.var, e2.var)) in prods.bodies:
-            new |= {
+            return {
                 e
                 for var in prods.bodies[body]
                 if (e := HellingsEdge(e1.start, var, e2.end)) not in edges
             }
 
-        return new
+        return set()
 
     queue: list[HellingsEdge] = list(edges)
     while queue:
