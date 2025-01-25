@@ -2,13 +2,16 @@ import itertools
 import operator
 from collections import defaultdict
 from functools import reduce
-from typing import Any, Iterable, NamedTuple, Optional, Self, cast
+from typing import Iterable, NamedTuple, Optional, Self, cast
 
-import numpy as np
-from numpy import bool_
-from numpy.typing import NDArray
-from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, Symbol
+from pyformlang.finite_automaton import (
+    NondeterministicFiniteAutomaton,
+    State,
+    Symbol,
+)
 from scipy.sparse import csr_array, kron
+
+from project.bidict import BiDict
 
 
 class AdjacencyMatrixFA:
@@ -29,7 +32,8 @@ class AdjacencyMatrixFA:
         """
         Construct intersection of finite automata.
         `states` attribute will contain keys of the following kind:
-        `(st1, st2)`, where `st1` & `st2` are states' names of `fa1` & `fa2` respectively
+        `State((st1, st2))`, where `st1` & `st2` are states' names
+        of `fa1` & `fa2` respectively
         """
         inter = cls(None)
 
@@ -45,7 +49,7 @@ class AdjacencyMatrixFA:
             if idx1 in fa1.final_states and idx2 in fa2.final_states:
                 inter.final_states.add(inter_idx)
 
-            inter.states[(st1, st2)] = inter_idx
+            inter.states[State((st1, st2))] = inter_idx
 
         for sym, adj1 in fa1.adj.items():
             if (adj2 := fa2.adj.get(sym)) is None:
@@ -62,29 +66,28 @@ class AdjacencyMatrixFA:
         # completely empty automaton
         if fa is None:
             self.states_count = 0
-            self.states = {}
+            self.states = BiDict()
             self.adj = {}
             return
 
-        graph = fa.to_networkx()
-        self.states_count = graph.number_of_nodes()
-        self.states: dict[Any, int] = {st: i for (i, st) in enumerate(graph.nodes)}
+        self.states: BiDict[State, int] = BiDict()
+        for idx, st in enumerate(fa.states):
+            self.states[st] = idx
 
-        for st, ddict in graph.nodes(data=True):
-            if ddict.get("is_start"):
-                self.start_states.add(self.states[st])
-            if ddict.get("is_final"):
-                self.final_states.add(self.states[st])
+            if st in fa.start_states:
+                self.start_states.add(idx)
+            if st in fa.final_states:
+                self.final_states.add(idx)
 
+            idx += 1
+
+        self.states_count = len(self.states)
         self.adj: dict[Symbol, csr_array] = defaultdict(
             lambda: csr_array((self.states_count, self.states_count), dtype=bool)
         )
-        for idx1, idx2, sym in (
-            (self.states[st1], self.states[st2], Symbol(lbl))
-            for st1, st2, lbl in graph.edges(data="label")
-            if lbl
-        ):
-            self.adj[sym][idx1, idx2] = True
+
+        for st1, sym, st2 in fa._transition_function.get_edges():
+            self.adj[sym][self.states[st1], self.states[st2]] = True
 
     def accepts(self, word: Iterable[Symbol]) -> bool:
         class Conf(NamedTuple):
@@ -112,24 +115,21 @@ class AdjacencyMatrixFA:
 
         return False
 
-    def transitive_closure(self) -> NDArray[bool_]:
+    def transitive_closure(self) -> csr_array:
         """
         Returns transitive closure for automaton states.
         Get indices from `states` attribute to index the matrix
         """
+        tc = csr_array((self.states_count, self.states_count), dtype=bool)
+        tc.setdiag(True)
+
         if not self.adj:
-            return np.diag(np.ones(self.states_count, dtype=bool_))
+            return tc
 
-        matrices = list(self.adj.values())
-        sum: csr_array = reduce(operator.add, matrices[1:], matrices[0])
-        sum.setdiag(True)  # make reflexive
-
-        # compute transitive closure using matrix exponentiation
-        tc = sum.toarray()
-        for pow in range(2, self.states_count + 1):
-            prev = tc
-            tc = np.linalg.matrix_power(prev, pow)
-            if np.array_equal(prev, tc):
+        tc: csr_array = reduce(operator.add, self.adj.values(), tc)
+        while True:
+            tc = cast(csr_array, (prev := tc) @ tc)
+            if prev.nnz == tc.nnz:
                 break
 
         return tc

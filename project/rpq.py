@@ -2,6 +2,7 @@ import itertools
 
 import numpy as np
 from networkx import MultiDiGraph
+from pyformlang.finite_automaton import State
 from scipy.sparse import lil_array, vstack
 
 from project.fa import AdjacencyMatrixFA, intersect_automata
@@ -30,8 +31,8 @@ def tensor_based_rpq(
             regex_dfa.start_states, regex_dfa.final_states
         )
         if inter_tc[
-            inter_mfa.states[(start, regex_start)],
-            inter_mfa.states[(final, regex_final)],
+            inter_mfa.states[State((start, regex_start))],
+            inter_mfa.states[State((final, regex_final))],
         ]
     }
 
