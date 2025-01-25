@@ -1,14 +1,17 @@
 import itertools
 import operator
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import reduce
 from typing import Iterable, NamedTuple, Optional, Self, cast
 
 from pyformlang.finite_automaton import (
+    DeterministicFiniteAutomaton,
     NondeterministicFiniteAutomaton,
     State,
     Symbol,
 )
+from pyformlang.rsa import RecursiveAutomaton
 from scipy.sparse import csr_array, kron
 
 from project.bidict import BiDict
@@ -147,3 +150,28 @@ def intersect_automata(
     automaton1: AdjacencyMatrixFA, automaton2: AdjacencyMatrixFA
 ) -> AdjacencyMatrixFA:
     return AdjacencyMatrixFA.from_intersection(automaton1, automaton2)
+
+
+@dataclass(frozen=True)
+class RSMState:
+    sym: Symbol
+    state: State
+
+
+def rsm_to_nfa(rsm: RecursiveAutomaton) -> NondeterministicFiniteAutomaton:
+    nfa = NondeterministicFiniteAutomaton()  # type: ignore
+
+    for sym, box in rsm.boxes.items():
+        dfa: DeterministicFiniteAutomaton = box.dfa
+
+        for start in dfa.start_states:
+            nfa.add_start_state(State(RSMState(sym, start)))
+        for final in dfa.final_states:
+            nfa.add_final_state(State(RSMState(sym, final)))
+
+        for st1, lbl, st2 in dfa._transition_function.get_edges():
+            nfa.add_transition(
+                State(RSMState(sym, st1)), lbl, State(RSMState(sym, st2))
+            )
+
+    return nfa

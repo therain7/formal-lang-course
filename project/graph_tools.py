@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 import cfpq_data
-from networkx import MultiDiGraph, nx_pydot
+from networkx import DiGraph, nx_pydot
 from pyformlang.finite_automaton import (
     NondeterministicFiniteAutomaton,
     State,
@@ -41,7 +41,7 @@ def build_save_2cycles_graph(
 
 
 def graph_to_nfa(
-    graph: MultiDiGraph, start_states: set[int], final_states: set[int]
+    graph: DiGraph, start_states: set[int], final_states: set[int]
 ) -> NondeterministicFiniteAutomaton:
     nfa: NondeterministicFiniteAutomaton = (
         NondeterministicFiniteAutomaton.from_networkx(
