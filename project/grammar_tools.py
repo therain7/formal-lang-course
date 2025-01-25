@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Iterable, cast
 
 from pyformlang.cfg import CFG, Epsilon, Production, Terminal, Variable
+from pyformlang.rsa import RecursiveAutomaton
 
 
 def cfg_to_weak_normal_form(cfg: CFG) -> CFG:
@@ -37,3 +38,11 @@ class ReversedProds:
                 and isinstance(var2 := prod.body[1], Variable)
             ):
                 self.bodies[(var1, var2)].add(prod.head)
+
+
+def cfg_to_rsm(cfg: CFG) -> RecursiveAutomaton:
+    return RecursiveAutomaton.from_text(cfg.to_text())
+
+
+def ebnf_to_rsm(ebnf: str) -> RecursiveAutomaton:
+    return RecursiveAutomaton.from_text(ebnf)
